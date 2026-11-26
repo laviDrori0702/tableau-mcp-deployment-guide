@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Self-Host Tableau MCP</title>
+<meta name="description" content="Run one Tableau MCP server beside your Tableau Server so everyone in your org can use Claude Code or Cursor with Tableau, each signed in as themselves.">
+<style>
+  :root {
+    --bg: #f7f8f9; --surface: #ffffff; --sunk: #eef1f3;
+    --ink: #1c2126; --soft: #4d565e; --rule: #dde1e5; --axis: #9aa3ab;
+    --accent: #0f6e78; --accent-wash: #e6f0f1;
+    --warn: #8a5a12; --warn-wash: #f6efe2; --warn-rule: #e0cda6;
+    --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --mono: ui-monospace, "Cascadia Code", Consolas, "Courier New", monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171a; --surface: #1b1f23; --sunk: #22272c;
+      --ink: #e6eaed; --soft: #aab3ba; --rule: #2d343a; --axis: #6b747c;
+      --accent: #5fb8c1; --accent-wash: #173235;
+      --warn: #d8a95f; --warn-wash: #2a2318; --warn-rule: #4a3d24;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 1rem/1.65 var(--font); }
+  .page { max-width: 46rem; margin: 0 auto; padding: 2.5rem 16px 5rem; display: flex; flex-direction: column; gap: 2rem; }
+  h1 { font-size: clamp(1.8rem, 5vw, 2.4rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0; }
+  h2 { font-size: 1.3rem; margin: 0; padding-top: 1.5rem; border-top: 1px solid var(--rule); }
+  h3 { font-size: 1.02rem; margin: 0.6rem 0 0; }
+  p, ul { margin: 0; }
+  section { display: flex; flex-direction: column; gap: 0.8rem; }
+  .lead { color: var(--soft); font-size: 1.08rem; }
+  .eyebrow { font: 600 0.72rem var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+  a { color: var(--accent); }
+  code { font-family: var(--mono); font-size: 0.86em; background: var(--sunk); padding: 0.1em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+  .code { position: relative; }
+  pre { margin: 0; background: var(--sunk); border: 1px solid var(--rule); border-radius: 6px; padding: 0.85rem 1rem; overflow-x: auto; font: 0.82rem/1.6 var(--mono); }
+  pre code { background: none; padding: 0; font-size: inherit; overflow-wrap: normal; }
+  .copy { position: absolute; top: 0.45rem; right: 0.45rem; font: 500 0.75rem var(--font); color: var(--accent); background: var(--surface); border: 1px solid var(--rule); border-radius: 4px; padding: 0.2rem 0.6rem; cursor: pointer; }
+  .copy:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  ul { padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.35rem; }
+  li::marker { color: var(--accent); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 6px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { text-align: left; vertical-align: top; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--rule); }
+  th { font: 600 0.72rem var(--font); letter-spacing: 0.08em; text-transform: uppercase; color: var(--soft); background: var(--sunk); }
+  tbody tr:last-child td { border-bottom: none; }
+  .note { background: var(--warn-wash); border: 1px solid var(--warn-rule); border-radius: 6px; padding: 0.8rem 1rem; }
+  .note strong { color: var(--warn); }
+  figure { margin: 0; background: var(--surface); border: 1px solid var(--rule); border-radius: 8px; padding: 0.5rem; }
+  figure svg { display: block; width: 100%; height: auto; }
+  svg .t-ink { fill: var(--ink); }
+  svg .t-soft { fill: var(--soft); }
+  svg .box { fill: none; stroke: var(--axis); stroke-width: 1.25; }
+  svg .box-main { fill: var(--accent-wash); stroke: var(--accent); stroke-width: 2; }
+  svg .edge { fill: none; stroke: var(--axis); stroke-width: 1.25; }
+  svg .head { fill: var(--axis); }
+  footer { color: var(--soft); font-size: 0.88rem; border-top: 1px solid var(--rule); padding-top: 1.2rem; }
+</style>
+</head>
+<body>
+<main class="page">
+
+<header style="display:flex;flex-direction:column;gap:0.7rem">
+  <div class="eyebrow">Deployment guide · Tableau Server</div>
+  <h1>Self-Host Tableau MCP</h1>
+  <p class="lead">Run one Tableau MCP server beside your Tableau Server, and everyone in your org can ask Claude Code or Cursor about Tableau content, each signed in as themselves. Plan about two hours plus one Tableau Server restart.</p>
+</header>
+
+<section>
+  <h2>At a glance</h2>
+  <figure>
+    <svg viewBox="0 0 760 408" role="img" aria-label="Users reach Tableau only through MCP, as themselves" font-size="13" font-family="system-ui, -apple-system, Segoe UI, sans-serif">
+      <defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path class="head" d="M0 0L10 5L0 10z"/></marker></defs>
+      <text class="t-ink" x="24" y="32" font-size="15" font-weight="600">Users reach Tableau only through MCP, as themselves</text>
+      <path class="edge" d="M380 128V184" marker-end="url(#arrow)"/>
+      <path class="edge" d="M380 256V312" marker-end="url(#arrow)"/>
+      <path class="edge" d="M230 92H170V348H230" stroke-dasharray="4 4" marker-end="url(#arrow)"/>
+      <text class="t-soft" x="392" y="160" font-size="11.5">asks over HTTPS</text>
+      <text class="t-soft" x="392" y="288" font-size="11.5">calls Tableau as that user</text>
+      <text class="t-soft" font-size="11.5" text-anchor="end"><tspan x="160" y="214">First use: sign in</tspan><tspan x="160" y="230">to Tableau in a browser</tspan></text>
+      <rect class="box" x="230" y="56" width="300" height="72" rx="8"/>
+      <text class="t-ink" x="380" y="80" text-anchor="middle" font-weight="600">Claude Code or Cursor</text>
+      <text class="t-soft" x="380" y="96" text-anchor="middle" font-size="11.5">on each user's machine</text>
+      <text class="t-soft" x="380" y="112" text-anchor="middle" font-size="11.5">config holds only the URL</text>
+      <rect class="box-main" x="230" y="184" width="300" height="72" rx="8"/>
+      <text class="t-ink" x="380" y="208" text-anchor="middle" font-weight="600">Tableau MCP server</text>
+      <text class="t-ink" x="380" y="224" text-anchor="middle" font-size="11.5">https://&lt;mcp-host&gt;:&lt;port&gt;/tableau-mcp</text>
+      <text class="t-ink" x="380" y="240" text-anchor="middle" font-size="11.5">checks each user's sign-in</text>
+      <rect class="box" x="230" y="312" width="300" height="72" rx="8"/>
+      <text class="t-ink" x="380" y="336" text-anchor="middle" font-weight="600">Tableau Server</text>
+      <text class="t-soft" x="380" y="352" text-anchor="middle" font-size="11.5">&lt;tableau-url&gt;</text>
+      <text class="t-soft" x="380" y="368" text-anchor="middle" font-size="11.5">REST API and VizQL Data Service</text>
+    </svg>
+  </figure>
+  <p>You run the middle box. No shared password exists anywhere: each user signs in to Tableau once, and the MCP server then works with that user's own permissions.</p>
+</section>
+
+<section>
+  <h2>Your values</h2>
+  <p>Every <code>&lt;placeholder&gt;</code> below stands for one of these. Write yours down first; the examples are fictional.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Placeholder</th><th>What it is</th><th>Example</th></tr></thead>
+    <tbody>
+      <tr><td><code>&lt;tableau-url&gt;</code></td><td>Your Tableau Server address</td><td><code>https://tableau.example.com</code></td></tr>
+      <tr><td><code>&lt;site&gt;</code></td><td>Site URL-name, the part after <code>/#/site/</code>. Empty for the Default site</td><td><code>Sales</code></td></tr>
+      <tr><td><code>&lt;mcp-host&gt;</code></td><td>Full DNS name of the machine running MCP. Must be in its certificate</td><td><code>mcp.corp.example.com</code></td></tr>
+      <tr><td><code>&lt;port&gt;</code></td><td>Port MCP listens on</td><td><code>3927</code> (the default)</td></tr>
+      <tr><td><code>&lt;install-dir&gt;</code></td><td>Folder for the server on that machine</td><td><code>C:\tableau-mcp</code></td></tr>
+    </tbody>
+  </table></div>
+  <p>The address users connect to is <code>https://&lt;mcp-host&gt;:&lt;port&gt;/tableau-mcp</code>, for example <code>https://mcp.corp.example.com:3927/tableau-mcp</code>.</p>
+</section>
+
+<section>
+  <h2>Before you start</h2>
+  <ul>
+    <li><strong>Tableau Server 2025.3 or newer.</strong> Per-user sign-in (OAuth) needs it. Check with <code>tsm version</code>.</li>
+    <li><strong>Node.js 22.7.5 or newer</strong> on the MCP machine: <code>node --version</code>. The Tableau Server host itself works fine.</li>
+    <li><strong>A TLS certificate for <code>&lt;mcp-host&gt;</code></strong>: the key, plus the certificate with its chain, as PEM files. Ask whoever issues your internal certificates.</li>
+    <li><strong>Tableau admin rights</strong> to run <code>tsm</code>, and <strong>local admin</strong> on the MCP machine.</li>
+    <li><strong>A maintenance window.</strong> Step 3 restarts Tableau Server once. Nothing else here touches Tableau users.</li>
+    <li><strong>Firewall:</strong> your workstations must reach <code>&lt;mcp-host&gt;:&lt;port&gt;</code>, and the MCP machine must reach <code>&lt;tableau-url&gt;</code>.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Set it up</h2>
+  <p>Run everything in an elevated PowerShell on the MCP machine, except step 3, which runs on the Tableau Server host.</p>
+
+  <h3>1. Install the server</h3>
+  <p>Pin a version so a restart never upgrades by surprise. Check <a href="https://www.npmjs.com/package/@tableau/mcp-server">npm</a> for the latest; 6.0.4 is shown here.</p>
+  <div class="code"><pre><code>New-Item -ItemType Directory -Force &lt;install-dir&gt;
+Set-Location &lt;install-dir&gt;
+npm install @tableau/mcp-server@6.0.4</code></pre></div>
+
+  <h3>2. Create the sign-in key</h3>
+  <p>The server encrypts users' access tokens with this key. <strong>It is a secret:</strong> anyone holding it can forge access. Never share or commit it.</p>
+  <div class="code"><pre><code>New-Item -ItemType Directory -Force certs
+node -e "const{generateKeyPairSync}=require('crypto');const{privateKey}=generateKeyPairSync('rsa',{modulusLength:2048});require('fs').writeFileSync('certs/oauth-jwe-private.pem',privateKey.export({type:'pkcs1',format:'pem'}))"</code></pre></div>
+
+  <h3>3. Let Tableau send sign-ins to the MCP host</h3>
+  <p>On the Tableau Server host, as a Tableau admin. <code>apply</code> <strong>restarts Tableau Server</strong> and ships everything staged, so list first.</p>
+  <div class="code"><pre><code>tsm pending-changes list
+tsm configuration set -k oauth.allowed_redirect_uri_hosts -v &lt;mcp-host&gt;
+tsm pending-changes apply</code></pre></div>
+  <p>Host name only: <code>mcp.corp.example.com</code>, not <code>https://mcp.corp.example.com:3927</code>.</p>
+
+  <h3>4. Add the certificate</h3>
+  <p>Copy two PEM files into <code>&lt;install-dir&gt;\certs</code>:</p>
+  <ul>
+    <li><code>mcp.key</code>: the private key, without a passphrase.</li>
+    <li><code>fullchain.pem</code>: the server certificate <strong>first</strong>, then any intermediate certificate, in one file.</li>
+  </ul>
+  <p>The certificate must list <code>&lt;mcp-host&gt;</code> as a Subject Alternative Name. Users must connect with exactly that name, not an IP or a short name.</p>
+
+  <h3>5. Write the <code>.env</code> file</h3>
+  <p>Create <code>&lt;install-dir&gt;\.env</code>:</p>
+  <div class="code"><pre><code>SERVER=&lt;tableau-url&gt;
+SITE_NAME=&lt;site&gt;
+TRANSPORT=http
+
+# Per-user sign-in. OAUTH_ISSUER is the MCP server's own address, not Tableau's.
+AUTH=oauth
+OAUTH_ISSUER=https://&lt;mcp-host&gt;:&lt;port&gt;
+OAUTH_RESOURCE_URI=https://&lt;mcp-host&gt;:&lt;port&gt;
+OAUTH_JWE_PRIVATE_KEY_PATH=&lt;install-dir&gt;\certs\oauth-jwe-private.pem
+
+# HTTPS. These exact names; anything else silently serves plain http.
+SSL_KEY=&lt;install-dir&gt;\certs\mcp.key
+SSL_CERT=&lt;install-dir&gt;\certs\fullchain.pem
+
+# Optional: hide tools Tableau Server can't use
+EXCLUDE_TOOLS=pulse</code></pre></div>
+  <p>Filled in, the first lines read <code>SERVER=https://tableau.example.com</code> and <code>OAUTH_ISSUER=https://mcp.corp.example.com:3927</code>. Add <code>PORT=&lt;port&gt;</code> only if you don't use 3927.</p>
+
+  <h3>6. Start it and check</h3>
+  <div class="code"><pre><code>Set-Location &lt;install-dir&gt;
+node --use-system-ca node_modules\@tableau\mcp-server\build\index.js</code></pre></div>
+  <p><code>--use-system-ca</code> makes Node trust your company's internal certificate authority when it calls Tableau. The startup line must say <code>https://</code>.</p>
+  <p>From a workstation, this must print <code>401</code>, meaning the server is up and asking for sign-in:</p>
+  <div class="code"><pre><code>try { Invoke-WebRequest -UseBasicParsing -Method POST -Uri https://&lt;mcp-host&gt;:&lt;port&gt;/tableau-mcp -ContentType application/json -Headers @{Accept='application/json, text/event-stream'} -Body '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-11-25","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}' } catch { $_.Exception.Response.StatusCode.value__ }</code></pre></div>
+</section>
+
+<section>
+  <h2>Run it at boot</h2>
+  <p>Started by hand, the server stops when you log off. A scheduled task running as SYSTEM keeps it up with nobody logged in. Stop the hand-started server first (<code>Ctrl+C</code>), then in an elevated PowerShell:</p>
+  <div class="code"><pre><code># 1. SYSTEM must read the secrets and write logs
+icacls &lt;install-dir&gt; /grant "SYSTEM:(OI)(CI)(R)"
+New-Item -ItemType Directory -Force &lt;install-dir&gt;\logs
+icacls &lt;install-dir&gt;\logs /grant "SYSTEM:(OI)(CI)(M)"
+Add-Content &lt;install-dir&gt;\.env "`nENABLED_LOGGERS=appLogger,fileLogger`nFILE_LOGGER_DIRECTORY=&lt;install-dir&gt;\logs"
+
+# 2. Register and start the task
+$node = (Get-Command node).Source
+$action = New-ScheduledTaskAction -Execute $node -Argument "--use-system-ca node_modules\@tableau\mcp-server\build\index.js" -WorkingDirectory "&lt;install-dir&gt;"
+$settings = New-ScheduledTaskSettingsSet -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero)
+Register-ScheduledTask -TaskName TableauMCP -Action $action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings $settings -User SYSTEM -RunLevel Highest
+Start-ScheduledTask -TaskName TableauMCP</code></pre></div>
+  <p>Check it with <code>Get-Content &lt;install-dir&gt;\logs\*.log -Tail 20</code>: the startup line must say <code>https://</code>. Then repeat the <code>401</code> check from step 6.</p>
+  <div class="note">
+    <p><strong>Three things that break it</strong></p>
+    <ul>
+      <li><code>--use-system-ca</code> must sit in <code>-Argument</code>. It does nothing in <code>.env</code>.</li>
+      <li><code>-ExecutionTimeLimit ([TimeSpan]::Zero)</code> matters: without it, Windows stops the task after three days.</li>
+      <li>To restart, run <code>Stop-ScheduledTask</code> then <code>Start-ScheduledTask</code>. Every restart signs all users out, so batch config changes.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <h2>Connect users</h2>
+  <p>Send your users the address and one of these. Nobody needs a password or token in the config: the first Tableau question opens a browser to sign in.</p>
+  <p><strong>Claude Code</strong> (<code>-s user</code> makes it work in every folder):</p>
+  <div class="code"><pre><code>claude mcp add -s user --transport http tableau https://&lt;mcp-host&gt;:&lt;port&gt;/tableau-mcp</code></pre></div>
+  <p>Then run <code>/mcp</code>, pick <code>tableau</code> and choose to authenticate.</p>
+  <p><strong>Cursor:</strong> add to <code>%USERPROFILE%\.cursor\mcp.json</code>, then restart Cursor:</p>
+  <div class="code"><pre><code>{
+  "mcpServers": {
+    "tableau": { "url": "https://&lt;mcp-host&gt;:&lt;port&gt;/tableau-mcp" }
+  }
+}</code></pre></div>
+  <p><strong>The check that proves it works:</strong> ask <em>"List our Tableau datasources, then query one."</em> Seeing the tool list is not enough, because it loads without contacting Tableau. Only data coming back proves the whole path.</p>
+  <p>Each user sees only what their own Tableau account can see, so a permission error is usually correct.</p>
+</section>
+
+<section>
+  <h2>If it fails</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Symptom</th><th>Cause</th><th>Fix</th></tr></thead>
+    <tbody>
+      <tr><td><code>UNABLE_TO_GET_ISSUER_CERT_LOCALLY</code></td><td>Node doesn't trust your internal CA</td><td>Start with <code>--use-system-ca</code>. Check this first</td></tr>
+      <tr><td><code>SELF_SIGNED_CERT_IN_CHAIN</code></td><td>Root CA is only in the intermediate store</td><td>Install it in <code>LocalMachine\Root</code></td></tr>
+      <tr><td>Startup line says <code>http://</code></td><td>Wrong variable names</td><td>Use exactly <code>SSL_KEY</code> and <code>SSL_CERT</code></td></tr>
+      <tr><td>Client: <code>fetch failed</code>, no status</td><td>Intermediate missing from the certificate file</td><td>Rebuild <code>fullchain.pem</code>: server cert, then intermediate</td></tr>
+      <tr><td>Client: <code>ERR_TLS_CERT_ALTNAME_INVALID</code></td><td>URL host isn't in the certificate</td><td>Use the exact <code>&lt;mcp-host&gt;</code> name</td></tr>
+      <tr><td>Sign-in fails at the browser redirect</td><td>Redirect host not set, mismatched or not applied</td><td>Redo step 3: host only, same as in <code>OAUTH_ISSUER</code>, then <code>apply</code></td></tr>
+      <tr><td><code>401</code> on the check</td><td>Expected</td><td>The server wants sign-in. Connect a real client</td></tr>
+      <tr><td><code>200</code> on the check</td><td>OAuth is off</td><td>Set <code>OAUTH_ISSUER</code>. Remove any <code>DANGEROUSLY_DISABLE_OAUTH</code> line</td></tr>
+      <tr><td>Client hangs, then times out</td><td>Firewall</td><td>Open <code>&lt;port&gt;</code> from users' workstations</td></tr>
+      <tr><td>Users asked to sign in again</td><td>Server restarted; sign-ins are kept in memory</td><td>Expected. Batch restarts</td></tr>
+      <tr><td><code>EADDRINUSE</code></td><td>Something already uses <code>&lt;port&gt;</code></td><td><code>Get-NetTCPConnection -LocalPort &lt;port&gt;</code> to find it</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>Sources</h2>
+  <ul>
+    <li><a href="https://github.com/tableau/tableau-mcp/blob/main/docs/docs/enterprise/tableau-server.md">Tableau MCP deployment guide for Tableau Server</a>: Tableau's own guide, including Docker and other ways to run it</li>
+    <li><a href="https://github.com/tableau/tableau-mcp">Tableau MCP repository</a>: every environment variable, and the tool list for <code>INCLUDE_TOOLS</code> / <code>EXCLUDE_TOOLS</code></li>
+    <li><a href="https://www.npmjs.com/package/@tableau/mcp-server">@tableau/mcp-server on npm</a>: released versions</li>
+  </ul>
+</section>
+
+<footer>Community guide, not an official Tableau document. All hostnames and values are placeholders or fictional examples.</footer>
+
+</main>
+<script>
+  // ponytail: one copy button per code block, select-text fallback when the clipboard API is blocked (file:// pages)
+  document.querySelectorAll(".code").forEach(function (wrap) {
+    var btn = document.createElement("button");
+    btn.className = "copy"; btn.type = "button"; btn.textContent = "Copy";
+    btn.addEventListener("click", function () {
+      var code = wrap.querySelector("code");
+      var done = function () { btn.textContent = "Copied"; setTimeout(function () { btn.textContent = "Copy"; }, 1500); };
+      var select = function () { var r = document.createRange(); r.selectNodeContents(code); var s = getSelection(); s.removeAllRanges(); s.addRange(r); btn.textContent = "Press Ctrl+C"; };
+      try { navigator.clipboard.writeText(code.textContent).then(done, select); } catch (e) { select(); }
+    });
+    wrap.appendChild(btn);
+  });
+</script>
+</body>
+</html>

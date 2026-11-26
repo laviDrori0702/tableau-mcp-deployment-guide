@@ -1,0 +1,16 @@
+# Never commit real deployment files
+.env
+.env.*
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+certs/
+logs/
+
+# OS and editor noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
